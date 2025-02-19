@@ -1,7 +1,4 @@
 "use client"
-
-import type React from "react"
-
 import { useState, useEffect, useRef } from "react"
 import { useChat } from "ai/react"
 import type { Theme, GameMode } from "@/types"
@@ -12,37 +9,39 @@ interface ChatInterfaceProps {
 }
 
 export default function ChatInterface({ theme, mode }: ChatInterfaceProps) {
-  const { messages, input, handleInputChange, handleSubmit } = useChat()
-  const [isStreaming, setIsStreaming] = useState(false)
-  const chatContainerRef = useRef<HTMLDivElement>(null)
+  const { messages, input, handleInputChange, handleSubmit } = useChat({
+    api: '/api/stream-adventure', // Your API endpoint
+    onResponse: (response) => {
+      // Optional: Handle any response metadata
+      if (!response.ok) {
+        console.error('Chat response error:', response.statusText);
+      }
+    },
+    onFinish: () => {
+      setIsStreaming(false);
+    },
+  });
 
+  const [isStreaming, setIsStreaming] = useState(false);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to bottom when messages change
   useEffect(() => {
     if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
-  }, [chatContainerRef.current]) // Updated dependency
+  }, [messages]); // Changed dependency to messages
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setIsStreaming(true)
-
-    if (mode === "streaming") {
-      // Use SSE for streaming mode
-      const eventSource = new EventSource(`/api/stream-adventure?theme=${theme}`)
-      eventSource.onmessage = (event) => {
-        const data = JSON.parse(event.data)
-        // Handle streaming data
-      }
-      eventSource.onerror = () => {
-        eventSource.close()
-        setIsStreaming(false)
-      }
-    } else {
-      // Use regular API call for non-streaming mode
-      await handleSubmit(e)
-      setIsStreaming(false)
+    e.preventDefault();
+    setIsStreaming(true);
+    try {
+      await handleSubmit(e);
+    } catch (error) {
+      console.error('Chat submission error:', error);
+      setIsStreaming(false);
     }
-  }
+  };
 
   return (
     <div className="bg-space-dark shadow-lg rounded-lg p-4">
