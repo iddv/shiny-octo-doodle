@@ -44,7 +44,7 @@ export async function POST(req: Request) {
   // Create the ChatOllama instance.
   const llm = new ChatOllama({
     baseUrl: "http://localhost:11434", // Ollama default URL
-    model: "mistral:7b",
+    model: "deepseek-r1:14b",
     streaming: true, // streaming enabled, though invoke won't stream
   });
 

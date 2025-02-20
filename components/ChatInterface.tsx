@@ -9,16 +9,34 @@ interface ChatInterfaceProps {
 }
 
 export default function ChatInterface({ theme, mode }: ChatInterfaceProps) {
+  const [streamingContent, setStreamingContent] = useState("");
   const { messages, input, handleInputChange, handleSubmit } = useChat({
     api: '/api/stream-adventure', // Your API endpoint
     onResponse: (response) => {
-      // Optional: Handle any response metadata
       if (!response.ok) {
         console.error('Chat response error:', response.statusText);
+        return;
+      }
+
+      // Handle the streaming response
+      const reader = response.body?.getReader();
+      if (reader) {
+        const decoder = new TextDecoder();
+        const readChunk = async () => {
+          const { done, value } = await reader.read();
+          if (done) {
+            return;
+          }
+          const chunk = decoder.decode(value, { stream: true });
+          setStreamingContent(prev => prev + chunk);
+          readChunk();
+        };
+        readChunk();
       }
     },
     onFinish: () => {
       setIsStreaming(false);
+      setStreamingContent("");
     },
   });
 
@@ -55,7 +73,13 @@ export default function ChatInterface({ theme, mode }: ChatInterfaceProps) {
             </span>
           </div>
         ))}
-        {isStreaming && <div className="text-space-accent">AI is typing...</div>}
+        {isStreaming && (
+          <div className="text-left">
+            <span className="inline-block p-2 rounded-lg bg-space-darker text-gray-200">
+              {streamingContent}
+            </span>
+          </div>
+        )}
       </div>
       <form onSubmit={onSubmit} className="flex">
         <input
