@@ -24,56 +24,122 @@
 //   return streamText.toDataStreamResponse(stream)
 // }
 
-import { ChatOllama } from "@langchain/ollama";
+import { ChatOllama } from "@langchain/ollama"
+import { HumanMessage, SystemMessage, AIMessage } from "@langchain/core/messages"
+import type { GameResponse } from "@/types/game"
+import { ADVENTURE_PROMPT } from "@/lib/prompts/adventure"
+
+export const runtime = "edge"
+
+// Create a singleton chat client
+let chatClient: ChatOllama | null = null;
+let messageHistory: Array<HumanMessage | SystemMessage | AIMessage> = [];
 
 export async function POST(req: Request) {
-  // Set CORS headers
   const headers = new Headers({
-    "Access-Control-Allow-Origin": "*", // adjust as needed
+    "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
   });
 
-  // Handle preflight request
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers });
   }
 
-  const { messages } = await req.json();
+  try {
+    const { messages, theme, endpoint, model, isNewGame } = await req.json();
 
-  // Create the ChatOllama instance.
-  const llm = new ChatOllama({
-    baseUrl: "http://localhost:11434", // Ollama default URL
-    model: "deepseek-r1:14b",
-    streaming: true, // streaming enabled, though invoke won't stream
-  });
+    // Initialize or reset chat client if needed
+    if (!chatClient || isNewGame) {
+      chatClient = new ChatOllama({
+        baseUrl: endpoint || process.env.NEXT_PUBLIC_DEFAULT_ENDPOINT,
+        model: model || process.env.NEXT_PUBLIC_DEFAULT_MODEL,
+        streaming: true,
+      });
+      
+      // Reset message history for new game
+      messageHistory = [
+        new SystemMessage(ADVENTURE_PROMPT.replace('${theme}', theme)),
+      ];
+    }
 
-  const encoder = new TextEncoder();
+    // Add user message to history
+    const lastMessage = messages[messages.length - 1];
+    messageHistory.push(new HumanMessage(lastMessage.content));
 
-  // Use llm.invoke to get the full response, then split it into chunks.
-  const stream = new ReadableStream({
-    async start(controller) {
-      try {
-        // llm.invoke returns the full AIMessage.
-        const fullResponse = await llm.invoke(messages);
-        const text = Array.isArray(fullResponse.content) ? fullResponse.content.join(' ') : fullResponse.content || "";
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          const result = await chatClient.invoke(messageHistory);
+          
+          // Clean and parse the response
+          const cleanContent = result.content.replace(/<think>.*?<\/think>/gs, '').trim();
+          const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
+          
+          if (!jsonMatch) {
+            throw new Error("No JSON content found in response");
+          }
 
-        // Choose a chunk size (e.g. 20 characters per chunk)
-        const chunkSize = 20;
-        for (let i = 0; i < text.length; i += chunkSize) {
-          const chunk = text.slice(i, i + chunkSize);
-          controller.enqueue(encoder.encode(chunk));
-          // Optionally simulate a slight delay between chunks
-          await new Promise((res) => setTimeout(res, 10));
+          const gameResponse: GameResponse = JSON.parse(jsonMatch[0]);
+          
+          // Validate required fields
+          if (!gameResponse.stats || !gameResponse.narrative || !gameResponse.choices) {
+            throw new Error("Missing required fields in game response");
+          }
+
+          // Add message history to system log
+          gameResponse.systemLog = {
+            ...gameResponse.systemLog,
+            messageHistory: messageHistory.map(msg => ({
+              role: msg instanceof SystemMessage ? 'system' : 
+                    msg instanceof HumanMessage ? 'user' : 'assistant',
+              content: msg.content
+            }))
+          };
+
+          // Add AI response to history
+          messageHistory.push(new AIMessage(gameResponse.narrative));
+
+          // Stream the response in chunks
+          const text = JSON.stringify(gameResponse);
+          const chunkSize = 100; // Larger chunk size for better JSON parsing
+          for (let i = 0; i < text.length; i += chunkSize) {
+            const chunk = text.slice(i, i + chunkSize);
+            controller.enqueue(encoder.encode(chunk));
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+          
+          controller.close();
+        } catch (error) {
+          console.error("❌ API: Streaming error:", error);
+          controller.error(error);
         }
-        controller.close();
-      } catch (error) {
-        controller.error(error);
-      }
-    },
-  });
+      },
+    });
 
-  return new Response(stream, { headers });
+    return new Response(stream, {
+      headers: {
+        ...headers,
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
+    });
+
+  } catch (error) {
+    console.error("❌ API: Error during streaming:", error);
+    return new Response(
+      JSON.stringify({ 
+        error: "Failed to generate story",
+        details: error instanceof Error ? error.message : "Unknown error"
+      }), 
+      {
+        status: 500,
+        headers,
+      }
+    );
+  }
 }
 
 
