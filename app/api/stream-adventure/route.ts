@@ -35,6 +35,27 @@ export const runtime = "edge"
 let chatClient: ChatOllama | null = null;
 let messageHistory: Array<HumanMessage | SystemMessage | AIMessage> = [];
 
+// Helper function to clean and parse LLM response
+async function parseGameResponse(content: string): Promise<GameResponse> {
+  // Remove thinking tags and trim whitespace
+  const cleanContent = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+  
+  // Find JSON content, allowing for any text before or after
+  const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error(`No valid JSON found in response: ${cleanContent.substring(0, 100)}...`);
+  }
+
+  const gameResponse = JSON.parse(jsonMatch[0]);
+  
+  // Validate required fields
+  if (!gameResponse.stats || !gameResponse.narrative || !gameResponse.choices) {
+    throw new Error("Missing required fields in game response");
+  }
+
+  return gameResponse;
+}
+
 export async function POST(req: Request) {
   const headers = new Headers({
     "Access-Control-Allow-Origin": "*",
@@ -48,18 +69,23 @@ export async function POST(req: Request) {
 
   try {
     const { messages, theme, endpoint, model, isNewGame } = await req.json();
+    
+    // Use default values from config if not provided
+    const baseUrl = endpoint || process.env.NEXT_PUBLIC_DEFAULT_ENDPOINT || "http://localhost:11434";
+    const modelName = model || process.env.NEXT_PUBLIC_DEFAULT_MODEL || "deepseek-r1:32b";
 
     // Initialize or reset chat client if needed
     if (!chatClient || isNewGame) {
+      console.log("🤖 API: Initializing streaming chat client with:", { baseUrl, modelName });
       chatClient = new ChatOllama({
-        baseUrl: endpoint || process.env.NEXT_PUBLIC_DEFAULT_ENDPOINT,
-        model: model || process.env.NEXT_PUBLIC_DEFAULT_MODEL,
+        baseUrl,
+        model: modelName,
         streaming: true,
       });
       
       // Reset message history for new game
       messageHistory = [
-        new SystemMessage(ADVENTURE_PROMPT.replace('${theme}', theme)),
+        new SystemMessage(ADVENTURE_PROMPT.replace('${theme}', theme || 'mystery')),
       ];
     }
 
@@ -73,20 +99,8 @@ export async function POST(req: Request) {
         try {
           const result = await chatClient.invoke(messageHistory);
           
-          // Clean and parse the response
-          const cleanContent = result.content.replace(/<think>.*?<\/think>/gs, '').trim();
-          const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
-          
-          if (!jsonMatch) {
-            throw new Error("No JSON content found in response");
-          }
-
-          const gameResponse: GameResponse = JSON.parse(jsonMatch[0]);
-          
-          // Validate required fields
-          if (!gameResponse.stats || !gameResponse.narrative || !gameResponse.choices) {
-            throw new Error("Missing required fields in game response");
-          }
+          // Use the helper function to parse response
+          const gameResponse = await parseGameResponse(result.content);
 
           // Add message history to system log
           gameResponse.systemLog = {
@@ -103,7 +117,7 @@ export async function POST(req: Request) {
 
           // Stream the response in chunks
           const text = JSON.stringify(gameResponse);
-          const chunkSize = 100; // Larger chunk size for better JSON parsing
+          const chunkSize = 100;
           for (let i = 0; i < text.length; i += chunkSize) {
             const chunk = text.slice(i, i + chunkSize);
             controller.enqueue(encoder.encode(chunk));

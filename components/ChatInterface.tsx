@@ -86,6 +86,12 @@ export default function ChatInterface({ theme, mode, endpoint, model, context }:
   const [gameState, setGameState] = useState<GameState | null>(null);
   const { messages, input, handleInputChange, handleSubmit } = useChat({
     api: '/api/stream-adventure',
+    body: {
+      theme,
+      endpoint,
+      model,
+      isNewGame: completedMessages.length === 0
+    },
     onResponse: async (response) => {
       if (!response.ok) {
         console.error('Chat response error:', response.statusText);
