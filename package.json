@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "user1": "NEXT_PUBLIC_PROFILE=user1 next dev",
+    "user2": "NEXT_PUBLIC_PROFILE=user2 next dev",
+    "dev": "NEXT_PUBLIC_PROFILE=default next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
