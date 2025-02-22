@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useChat } from "ai/react"
 import type { Theme, GameMode, GameResponse } from "@/types"
+import { ChoiceOptions } from './ChatInterface/ChoiceOptions'
 
 interface ChatInterfaceProps {
   theme: Theme
@@ -169,20 +170,6 @@ export default function ChatInterface({ theme, mode, endpoint, model, context, s
 
   return (
     <div className="bg-space-dark shadow-lg rounded-lg p-4">
-      {/* Game Stats Display
-      {gameState?.stats && (
-        <div className="mb-4 p-4 bg-space-darker rounded-lg">
-          <h3 className="text-space-accent font-bold mb-2">Game Stats</h3>
-          <div className="grid grid-cols-2 gap-2">
-            <div>❤️ Health: {gameState.stats.health}/{gameState.stats.maxHealth}</div>
-            <div>💰 Gold: {gameState.stats.gold}</div>
-            <div className="col-span-2">
-              🎒 Inventory: {gameState.stats.inventory.join(', ') || 'Empty'}
-            </div>
-          </div>
-        </div>
-      )} */}
-
       {/* Adventure story output */}
       <div className="mb-4">
         <h3 className="text-space-accent font-bold mb-2">Current Adventure</h3>
@@ -215,6 +202,22 @@ export default function ChatInterface({ theme, mode, endpoint, model, context, s
             </div>
           </div>
         ))}
+        
+        {/* Choice Options */}
+        {gameState?.choices && gameState.choices.length > 0 && (
+          <div className="flex justify-center">
+            <ChoiceOptions 
+              choices={gameState.choices} 
+              onSelect={(choice) => {
+                setInput(choice);
+                // Use setTimeout to ensure input is set before submitting
+                setTimeout(() => {
+                  handleSubmit(new Event('submit') as any);
+                }, 0);
+              }} 
+            />
+          </div>
+        )}
       </div>
 
       {/* Input form */}
