@@ -37,37 +37,47 @@ export default function ChatInterface({ theme, mode }: ChatInterfaceProps) {
         console.error('Chat response error:', response.statusText);
         return;
       }
-      console.log(response.status);
 
+      // Don't add user message here anymore, we'll handle it in onSubmit
       setIsStreaming(true);
-      setStreamingContent(""); // Reset streaming content
-      streamingContentRef.current = ""; // Reset the ref as well
+      setStreamingContent("");
+      streamingContentRef.current = "";
       const reader = response.body?.getReader();
       if (reader) {
         const decoder = new TextDecoder();
         const readChunk = async () => {
-          const { done, value } = await reader.read();
-          if (done) {
+          try {
+            const { done, value } = await reader.read();
+            if (done) {
+              setIsStreaming(false);
+              const cleanContent = streamingContentRef.current
+                .replace(/<think>|<\/think>/g, '')
+                .trim();
+              
+              // Add the assistant message to completedMessages
+              setCompletedMessages(prev => [
+                ...prev,
+                {
+                  id: Date.now().toString(),
+                  role: 'assistant',
+                  content: cleanContent
+                }
+              ]);
+              setStreamingContent("");
+              streamingContentRef.current = "";
+              return;
+            }
+            const chunk = decoder.decode(value);
+            streamingContentRef.current += chunk;
+            const cleanStreamingContent = streamingContentRef.current
+              .replace(/<think>|<\/think>/g, '')
+              .trim();
+            setStreamingContent(cleanStreamingContent);
+            await readChunk();
+          } catch (error) {
+            console.error("Error reading chunk:", error);
             setIsStreaming(false);
-            // console.log("Adding assistant message:", streamingContentRef.current);
-            setCompletedMessages(prev => {
-              console.log("Prev:", prev);
-              const newMessages = [...prev, {
-                id: Date.now().toString(),
-                role: 'assistant' as const,
-                content: streamingContentRef.current
-              }];
-              console.log("Updated completedMessages:", newMessages);
-              return newMessages;
-            });
-            setStreamingContent(""); // Reset streaming content after moving it to completedMessages
-            streamingContentRef.current = ""; // Reset the ref as well
-            return;
           }
-          const chunk = decoder.decode(value, { stream: true });
-          streamingContentRef.current += chunk; // Update the ref
-          setStreamingContent(streamingContentRef.current); // Update the state
-          readChunk();
         };
         readChunk();
       }
@@ -107,13 +117,13 @@ useEffect(() => {
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
-      // Add user message to completedMessages
-      console.log("Adding User Message to Completed Messages", input);
-      setCompletedMessages(prev => [...prev, {
+      // Add user message to completedMessages before sending to AI
+      const userMessage = {
         id: Date.now().toString(),
         role: 'user',
         content: input
-      }]);
+      };
+      setCompletedMessages(prev => [...prev, userMessage]);
       await handleSubmit(e);
     } catch (error) {
       console.error('Chat submission error:', error);
@@ -130,7 +140,7 @@ useEffect(() => {
             <span className={`inline-block p-2 rounded-lg ${
               message.role === 'user' ? 'bg-space-primary text-white' : 'bg-space-darker text-gray-200'
             }`}>
-              [{message.role}]: {message.content || 'Empty message'}
+              {message.content}
             </span>
           </div>
         ))}
