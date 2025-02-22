@@ -28,20 +28,6 @@ export function ChatView({
 }: ChatViewProps) {
   return (
     <div className="bg-space-dark shadow-lg rounded-lg p-4">
-      {/* Game Stats Display */}
-      {gameState?.stats && (
-        <div className="mb-4 p-4 bg-space-darker rounded-lg">
-          <h3 className="text-space-accent font-bold mb-2">Game Stats</h3>
-          <div className="grid grid-cols-2 gap-2">
-            <div>❤️ Health: {gameState.stats.health}/{gameState.stats.maxHealth || 100}</div>
-            <div>💰 Gold: {gameState.stats.gold || 0}</div>
-            <div className="col-span-2">
-              🎒 Inventory: {gameState.stats.inventory?.join(', ') || 'Empty'}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Adventure story output */}
       <div className="mb-4">
         <h3 className="text-space-accent font-bold mb-2">Current Adventure</h3>

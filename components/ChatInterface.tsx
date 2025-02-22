@@ -9,6 +9,7 @@ interface ChatInterfaceProps {
   endpoint: string
   model: string
   context: string
+  setStats: (stats: CharacterStats) => void
 }
 
 interface Message {
@@ -29,7 +30,7 @@ interface Message {
  * @param {GameMode} props.mode - The current game mode.
  * @returns {JSX.Element} A React component that renders the chat interface.
  */
-export default function ChatInterface({ theme, mode, endpoint, model, context }: ChatInterfaceProps) {
+export default function ChatInterface({ theme, mode, endpoint, model, context, setStats }: ChatInterfaceProps) {
   const [completedMessages, setCompletedMessages] = useState<Message[]>([]);
   const [gameState, setGameState] = useState<GameResponse | null>(() => {
     // Initialize gameState with context if available
@@ -109,9 +110,17 @@ export default function ChatInterface({ theme, mode, endpoint, model, context }:
               ...prevState?.stats,
               health: data.stats?.health ?? prevState?.stats?.health ?? 100,
               gold: data.stats?.gold ?? prevState?.stats?.gold ?? 0,
-              inventory: data.stats?.inventory ?? prevState?.stats?.inventory ?? [],
+              inventory: data.stats?.inventory ?? prevState?.stats?.inventory ?? []
             }
           };
+          
+          // Update parent component's stats
+          setStats({
+            health: newState.stats.health,
+            gold: newState.stats.gold,
+            inventory: newState.stats.inventory
+          });
+          
           return newState;
         });
 
@@ -160,7 +169,7 @@ export default function ChatInterface({ theme, mode, endpoint, model, context }:
 
   return (
     <div className="bg-space-dark shadow-lg rounded-lg p-4">
-      {/* Game Stats Display */}
+      {/* Game Stats Display
       {gameState?.stats && (
         <div className="mb-4 p-4 bg-space-darker rounded-lg">
           <h3 className="text-space-accent font-bold mb-2">Game Stats</h3>
@@ -172,7 +181,7 @@ export default function ChatInterface({ theme, mode, endpoint, model, context }:
             </div>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Adventure story output */}
       <div className="mb-4">

@@ -61,6 +61,7 @@ export default function Home() {
               endpoint={endpoint}
               model={model}
               context={context}
+              setStats={setStats}
             />
           </div>
           <div>
