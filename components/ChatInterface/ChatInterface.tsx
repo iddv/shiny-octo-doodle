@@ -1,7 +1,7 @@
-"use client"
 import { useState, useEffect, useRef } from "react"
 import { useChat } from "ai/react"
 import type { Theme, GameMode, GameResponse } from "@/types"
+import { ChatView } from "./ChatView"
 
 interface ChatInterfaceProps {
   theme: Theme
@@ -17,22 +17,9 @@ interface Message {
   content: string
 }
 
-/**
- * ChatInterface component for rendering a chat interface with streaming capabilities.
- * 
- * This component handles the display of chat messages, streaming of incoming messages,
- * and user input for sending new messages. It uses the useChat hook for managing
- * chat state and communication with the server.
- *
- * @param {Object} props - The properties passed to the component.
- * @param {Theme} props.theme - The current theme of the application.
- * @param {GameMode} props.mode - The current game mode.
- * @returns {JSX.Element} A React component that renders the chat interface.
- */
 export default function ChatInterface({ theme, mode, endpoint, model, context }: ChatInterfaceProps) {
   const [completedMessages, setCompletedMessages] = useState<Message[]>([]);
   const [gameState, setGameState] = useState<GameResponse | null>(() => {
-    // Initialize gameState with context if available
     if (context) {
       console.log("🎲 ChatInterface: Initializing with context:", context);
       return {
@@ -99,23 +86,31 @@ export default function ChatInterface({ theme, mode, endpoint, model, context }:
         const data = await response.json();
         console.log("📦 ChatInterface: Parsed response data:", data);
         
-        // Update game state with new narrative
         setGameState(prevState => {
           const newState = {
-            ...data,
+            ...prevState,
             narrative: data.narrative || prevState?.narrative || "",
             storySoFar: data.storySoFar || data.narrative || prevState?.storySoFar || "",
             stats: {
               ...prevState?.stats,
               health: data.stats?.health ?? prevState?.stats?.health ?? 100,
+              maxHealth: data.stats?.maxHealth ?? prevState?.stats?.maxHealth ?? 100,
               gold: data.stats?.gold ?? prevState?.stats?.gold ?? 0,
-              inventory: data.stats?.inventory ?? prevState?.stats?.inventory ?? [],
-            }
+              inventory: data.stats?.inventory ?? prevState?.stats?.inventory ?? []
+            },
+            systemLog: {
+              ...prevState?.systemLog,
+              ...data.systemLog
+            },
+            changes: {
+              ...prevState?.changes,
+              ...data.changes
+            },
+            choices: data.choices || []
           };
           return newState;
         });
 
-        // Add both user and AI messages to completed messages
         setCompletedMessages(prev => [
           ...prev,
           {
@@ -130,7 +125,6 @@ export default function ChatInterface({ theme, mode, endpoint, model, context }:
           }
         ]);
 
-        // Clear input after successful response
         setInput('');
       } catch (error) {
         console.error("❌ ChatInterface: Error processing game response:", error);
@@ -139,7 +133,6 @@ export default function ChatInterface({ theme, mode, endpoint, model, context }:
     },
   });
 
-  // Add effect to update gameState when context changes
   useEffect(() => {
     if (context) {
       console.log("🔄 ChatInterface: Context updated, updating gameState");
@@ -151,7 +144,6 @@ export default function ChatInterface({ theme, mode, endpoint, model, context }:
     }
   }, [context]);
 
-  // Scroll to bottom when messages update
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
@@ -159,73 +151,14 @@ export default function ChatInterface({ theme, mode, endpoint, model, context }:
   }, [completedMessages]);
 
   return (
-    <div className="bg-space-dark shadow-lg rounded-lg p-4">
-      {/* Game Stats Display */}
-      {gameState?.stats && (
-        <div className="mb-4 p-4 bg-space-darker rounded-lg">
-          <h3 className="text-space-accent font-bold mb-2">Game Stats</h3>
-          <div className="grid grid-cols-2 gap-2">
-            <div>❤️ Health: {gameState.stats.health}/{gameState.stats.maxHealth}</div>
-            <div>💰 Gold: {gameState.stats.gold}</div>
-            <div className="col-span-2">
-              🎒 Inventory: {gameState.stats.inventory.join(', ') || 'Empty'}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Adventure story output */}
-      <div className="mb-4">
-        <h3 className="text-space-accent font-bold mb-2">Current Adventure</h3>
-        <textarea
-          value={gameState?.narrative || "Your adventure is about to begin..."}
-          readOnly
-          className="w-full p-2 border rounded bg-space-darker text-gray-200 border-space-primary focus:outline-none min-h-[80px] resize-none opacity-90 cursor-default"
-          rows={3}
-        />
-      </div>
-
-      {/* Chat messages */}
-      <div 
-        ref={chatContainerRef} 
-        className="h-96 overflow-y-auto mb-4 space-y-4 p-2"
-      >
-        {completedMessages.map((message) => (
-          <div 
-            key={message.id} 
-            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div 
-              className={`max-w-[80%] p-3 rounded-lg ${
-                message.role === 'user' 
-                  ? 'bg-space-primary text-white ml-4' 
-                  : 'bg-space-darker text-gray-200 mr-4'
-              }`}
-            >
-              {message.content}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Input form */}
-      <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-        <textarea
-          value={input}
-          onChange={handleInputChange}
-          placeholder="Type your action..."
-          disabled={isStreaming}
-          className="flex-grow mr-2 p-2 border rounded bg-space-darker text-gray-200 border-space-primary focus:outline-none focus:ring-2 focus:ring-space-accent min-h-[80px] resize-y w-full disabled:opacity-50"
-          rows={3}
-        />
-        <button 
-          type="submit" 
-          disabled={isStreaming || !input.trim()}
-          className="bg-space-accent text-white p-2 rounded hover:bg-opacity-80 transition-colors w-full disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isStreaming ? 'Processing...' : 'Send'}
-        </button>
-      </form>
-    </div>
+    <ChatView
+      gameState={gameState}
+      completedMessages={completedMessages}
+      isStreaming={isStreaming}
+      input={input}
+      handleInputChange={handleInputChange}
+      handleSubmit={handleSubmit}
+      chatContainerRef={chatContainerRef}
+    />
   );
-}
+} 

@@ -10,54 +10,45 @@ let chatClient: ChatOllama | null = null;
 let messageHistory: Array<HumanMessage | SystemMessage | AIMessage> = [];
 
 export async function GET(req: Request) {
-  console.log("🚀 API: Starting chat request");
+  console.log("🚀 Chat API: Starting chat request");
   
   const headers = new Headers({
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
   });
 
-  if (req.method === 'OPTIONS') {
-    console.log("👋 API: Handling OPTIONS request");
-    return new Response(null, {
-      status: 204,
-      headers,
-    });
-  }
+  const { searchParams } = new URL(req.url);
+  
+  // Extract parameters with logging
+  const config = {
+    theme: searchParams.get("theme") || "mystery",
+    endpoint: searchParams.get("endpoint") || process.env.NEXT_PUBLIC_DEFAULT_ENDPOINT || "http://localhost:11434",
+    model: searchParams.get("model") || process.env.NEXT_PUBLIC_DEFAULT_MODEL || "deepseek-r1:32b",
+    message: searchParams.get("message") || "Start a new adventure in this theme.",
+    isNewGame: searchParams.get("newGame") === "true"
+  };
 
-  const { searchParams } = new URL(req.url)
-  const theme = searchParams.get("theme") || "mystery"
-  const endpoint = searchParams.get("endpoint") || process.env.NEXT_PUBLIC_DEFAULT_ENDPOINT
-  const modelName = searchParams.get("model") || process.env.NEXT_PUBLIC_DEFAULT_MODEL
-  const userInput = searchParams.get("message") || "Start a new adventure in this theme."
-  const isNewGame = searchParams.get("newGame") === "true"
-
-  console.log("📝 API: Configuration", {
-    theme,
-    endpoint,
-    modelName
-  });
+  console.log("🔧 Chat API: Using configuration:", config);
 
   try {
     // Initialize or reset chat client if needed
-    if (!chatClient || isNewGame) {
-      console.log("🤖 API: Initializing new chat client");
+    if (!chatClient || config.isNewGame) {
+      console.log("🤖 Chat API: Initializing new chat client");
       chatClient = new ChatOllama({
-        baseUrl: endpoint,
-        model: modelName,
+        baseUrl: config.endpoint,
+        model: config.model,
       });
       
       // Reset message history for new game
       messageHistory = [
-        new SystemMessage(ADVENTURE_PROMPT.replace('${theme}', theme)),
+        new SystemMessage(ADVENTURE_PROMPT.replace('${theme}', config.theme)),
       ];
     }
 
     // Add user message to history
-    messageHistory.push(new HumanMessage(userInput));
+    messageHistory.push(new HumanMessage(config.message));
 
-    console.log("💭 API: Invoking LLM with message history");
+    console.log("💭 Chat API: Invoking LLM with message history");
     const result = await chatClient.invoke(messageHistory);
 
     console.log("✨ API: LLM Response:", result);

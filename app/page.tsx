@@ -30,14 +30,20 @@ export default function Home() {
     });
 
     try {
-      const response = await fetch(`/api/chat?theme=${theme}&endpoint=${endpoint}&model=${model}`);
+      const params = new URLSearchParams({
+        theme,
+        endpoint,
+        model,
+        newGame: 'true'
+      });
+      const response = await fetch(`/api/chat?${params}`);
       console.log("📡 UI: Got response:", response.status);
       
       const data = await response.json();
       console.log("📄 UI: Received data:", data);
       
-      setContext(data.content);
-      console.log("✅ UI: Context updated with new story");
+      setContext(data.narrative);
+      console.log("✅ UI: Context and narrative updated:", data.narrative);
     } catch (error) {
       console.error("❌ UI: Failed to load adventure:", error);
     }
