@@ -3,6 +3,9 @@ import { HumanMessage, SystemMessage, AIMessage } from "@langchain/core/messages
 import type { GameResponse } from "@/types/game"
 import { ADVENTURE_PROMPT } from "@/lib/prompts/adventure"
 
+// Add TextEncoder for streaming
+const encoder = new TextEncoder();
+
 export const runtime = "edge"
 
 // Create a singleton chat client

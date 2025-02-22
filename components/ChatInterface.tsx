@@ -11,6 +11,7 @@ interface ChatInterfaceProps {
   model: string
   context: string
   setStats: (stats: CharacterStats) => void
+  initialGameState: GameResponse | null
 }
 
 interface Message {
@@ -31,10 +32,20 @@ interface Message {
  * @param {GameMode} props.mode - The current game mode.
  * @returns {JSX.Element} A React component that renders the chat interface.
  */
-export default function ChatInterface({ theme, mode, endpoint, model, context, setStats }: ChatInterfaceProps) {
+export default function ChatInterface({ 
+  theme, 
+  mode, 
+  endpoint, 
+  model, 
+  context,
+  setStats,
+  initialGameState 
+}: ChatInterfaceProps) {
   const [completedMessages, setCompletedMessages] = useState<Message[]>([]);
   const [gameState, setGameState] = useState<GameResponse | null>(() => {
-    // Initialize gameState with context if available
+    if (initialGameState) {
+      return initialGameState;
+    }
     if (context) {
       console.log("🎲 ChatInterface: Initializing with context:", context);
       return {
@@ -82,7 +93,7 @@ export default function ChatInterface({ theme, mode, endpoint, model, context, s
     initialMessages: [{
       id: 'initial',
       role: 'system',
-      content: 'Begin the adventure'
+      content: 'Begin the adventure with three choices for the player'
     }],
     body: {
       theme,
@@ -160,6 +171,13 @@ export default function ChatInterface({ theme, mode, endpoint, model, context, s
       }));
     }
   }, [context]);
+
+  // Add effect to handle initialGameState updates
+  useEffect(() => {
+    if (initialGameState) {
+      setGameState(initialGameState);
+    }
+  }, [initialGameState]);
 
   // Scroll to bottom when messages update
   useEffect(() => {

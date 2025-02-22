@@ -21,6 +21,7 @@ export default function Home() {
     gold: 0,
     inventory: [],
   })
+  const [gameState, setGameState] = useState<GameResponse | null>(null)
 
   const handleLoadAdventure = async () => {
     console.log("🎮 UI: Loading adventure with config:", {
@@ -43,7 +44,24 @@ export default function Home() {
       console.log("📄 UI: Received data:", data);
       
       setContext(data.narrative);
-      console.log("✅ UI: Context and narrative updated:", data.narrative);
+      setStats({
+        health: data.stats?.health ?? 100,
+        gold: data.stats?.gold ?? 0,
+        inventory: data.stats?.inventory ?? []
+      });
+
+      const initialGameState = {
+        narrative: data.narrative,
+        storySoFar: data.narrative,
+        stats: data.stats,
+        systemLog: data.systemLog,
+        changes: data.changes,
+        choices: data.choices
+      };
+
+      setGameState(initialGameState);
+      
+      console.log("✅ UI: Game state initialized:", initialGameState);
     } catch (error) {
       console.error("❌ UI: Failed to load adventure:", error);
     }
@@ -62,6 +80,7 @@ export default function Home() {
               model={model}
               context={context}
               setStats={setStats}
+              initialGameState={gameState}
             />
           </div>
           <div>
